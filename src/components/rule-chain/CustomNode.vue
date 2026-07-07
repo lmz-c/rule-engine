@@ -9,16 +9,17 @@
     </div>
     <div class="node-label">{{ data?.label || type }}</div>
     <div class="node-type">{{ type }}</div>
-    <div class="node-handles">
-      <!-- 输入端口（左侧） -->
-      <div class="handle handle-left">
-        <Handle type="target" :position="Position.Left" />
-      </div>
-      <!-- 输出端口（右侧） -->
-      <div class="handle handle-right">
-        <Handle type="source" :position="Position.Right" />
-      </div>
-    </div>
+    <Handle
+    id="target"
+    type="target"
+    :position="Position.Left"
+/>
+
+<Handle
+    id="source"
+    type="source"
+    :position="Position.Right"
+/>
   </div>
 </template>
 

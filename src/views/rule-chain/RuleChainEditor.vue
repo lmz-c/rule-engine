@@ -9,7 +9,7 @@
         </el-button>
       </div>
       <div v-show="toolboxOpen" class="toolbox-body">
-        <el-collapse v-model="activeCategories" accordion>
+        <el-collapse v-model="activeCategories">
           <el-collapse-item
             v-for="(nodes, category) in groupedNodes"
             :key="category"
@@ -48,7 +48,7 @@
       </div>
 
       <!-- 画布 -->
-      <div class="canvas-area" ref="canvasRef" @drop="onDrop" @dragover.prevent>
+      <div class="canvas-area" ref="canvasRef" >
         <VueFlow
           v-model:nodes="nodes"
           v-model:edges="edges"
@@ -58,6 +58,8 @@
           @edge-click="onEdgeClick"
           @connect="onConnect"
           @node-drag-stop="onNodeDragStop"
+          @drop="onDrop" 
+          @dragover="onDragOver"
         >
           <Background pattern-color="#ddd" :gap="20" />
           <Controls position="bottom-right" />
@@ -195,7 +197,7 @@ const maxWidth = 600
 const isResizing = ref(false)
 
 // ===== VueFlow =====
-const { nodes, edges, addNodes, addEdges, getNodes, getEdges, updateNode, fitView, removeNodes, removeEdges } = useVueFlow()
+const { nodes, edges, addNodes, addEdges, getNodes, getEdges, updateNode, fitView, removeNodes, removeEdges ,screenToFlowCoordinate} = useVueFlow()
 const nodeTypes = {
   'custom-node': CustomNode
 }
@@ -250,7 +252,14 @@ const groupedNodes = computed(() => {
   return groups
 })
 
-const activeCategories = ref('FILTER')
+const activeCategories = ref([
+  'FILTER',
+  'ACTION',
+  'TRANSFORM',
+  'FLOW',
+  'EXTERNAL',
+  'AI'
+])
 const nodeCount = computed(() => getNodes.value.filter(n => n.type === 'custom-node').length)
 const edgeCount = computed(() => getEdges.value.length)
 
@@ -328,19 +337,32 @@ const onDragStart = (event: DragEvent, node: any) => {
 const onDragEnd = () => {}
 
 const onDrop = (event: DragEvent) => {
+
   event.preventDefault()
+
   const raw = event.dataTransfer?.getData('application/json')
+
   if (!raw) return
 
   const nodeData = JSON.parse(raw)
-  const canvasRect = canvasRef.value?.getBoundingClientRect()
-  const x = event.clientX - (canvasRect?.left || 0) - 50
-  const y = event.clientY - (canvasRect?.top || 0) - 20
+
+  // 浏览器坐标 -> Flow坐标
+  const position = screenToFlowCoordinate({
+    x: event.clientX,
+    y: event.clientY
+  })
+    console.log({
+      clientX:event.clientX,
+      clientY:event.clientY,
+      position,
+  })
 
   const newNode = {
-    id: `node_${Date.now()}`,
+    id: `node_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     type: 'custom-node',
-    position: { x: Math.max(0, x), y: Math.max(0, y) },
+
+    position,
+
     data: {
       label: nodeData.name,
       type: nodeData.type,
@@ -352,6 +374,13 @@ const onDrop = (event: DragEvent) => {
   addNodes([newNode])
 }
 
+const onDragOver = (event: DragEvent) => {
+  event.preventDefault()
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
 // ===== 节点点击 =====
 const onNodeClick = (event: any) => {
   const node = event.node
@@ -361,18 +390,23 @@ const onNodeClick = (event: any) => {
 
 // ===== 连线 =====
 const onConnect = (connection: any) => {
-  // 默认使用 Success 标签
+
   const edge = {
-    id: `e_${connection.source}_${connection.target}`,
+    id: `e_${Date.now()}`,
     source: connection.source,
-    sourceHandle: connection.sourceHandle || 'Success',
-    target: connection.target
+    target: connection.target,
+
+    // 先默认 Success
+    label: 'Success',
+
+    data: {
+      relation: 'Success'
+    },
+
+    animated: false
   }
-  // 检查是否已存在相同连线
-  const exists = getEdges.value.some(e => e.source === edge.source && e.target === edge.target)
-  if (!exists) {
-    addEdges([edge])
-  }
+
+  addEdges([edge])
 }
 
 const onEdgeClick = (event: any) => {
@@ -614,8 +648,9 @@ const toggleProperty = () => {
 }
 
 .canvas-area {
-  flex: 1;
-  height: calc(100% - 48px);
+  flex:1;
+  position:relative;
+  overflow:hidden;
   background: #f7f8fa;
   position: relative;
 }
