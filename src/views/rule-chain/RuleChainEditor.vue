@@ -48,7 +48,7 @@
       </div>
 
       <!-- 画布 -->
-      <div class="canvas-area" ref="canvasRef" @drop="onDrop" @dragover.prevent>
+      <div class="canvas-area" ref="canvasRef" @drop.prevent="onDrop" @dragover.prevent="onDragOver">
         <VueFlow
           v-model:nodes="nodes"
           v-model:edges="edges"
@@ -59,7 +59,7 @@
           @connect="onConnect"
           @node-drag-stop="onNodeDragStop"
         >
-          <Background pattern-color="#ddd" :gap="20" />
+          <Background pattern-color="#ddd" :gap="gridSize" />
           <Controls position="bottom-right" />
         </VueFlow>
       </div>
@@ -112,45 +112,56 @@
               </el-form-item>
               <template v-for="(field, key) in configSchema" :key="key">
                 <el-form-item :label="key">
-                  <el-input
-                    v-if="field.type === 'string'"
-                    v-model="selectedNode.data.config[key]"
-                    size="small"
-                    :placeholder="field.placeholder"
-                  />
-                  <el-input-number
-                    v-else-if="field.type === 'number'"
-                    v-model="selectedNode.data.config[key]"
-                    size="small"
-                    :placeholder="field.placeholder"
-                    controls-position="right"
-                  />
-                  <el-select
-                    v-else-if="field.type === 'enum'"
-                    v-model="selectedNode.data.config[key]"
-                    size="small"
-                    :placeholder="field.placeholder"
-                  >
-                    <el-option
-                      v-for="opt in field.options"
-                      :key="opt"
-                      :label="opt"
-                      :value="opt"
+                  <!-- 如果 field 或 field.type 不存在，跳过 -->
+                  <template v-if="field && field.type">
+                    <el-input
+                      v-if="field.type === 'string'"
+                      v-model="selectedNode.data.config[key]"
+                      size="small"
+                      :placeholder="field.placeholder"
                     />
-                  </el-select>
-                  <el-input
-                    v-else-if="field.type === 'textarea'"
-                    v-model="selectedNode.data.config[key]"
-                    type="textarea"
-                    :rows="3"
-                    size="small"
-                    :placeholder="field.placeholder"
-                  />
-                  <el-switch
-                    v-else-if="field.type === 'boolean'"
-                    v-model="selectedNode.data.config[key]"
-                    size="small"
-                  />
+                    <el-input-number
+                      v-else-if="field.type === 'number'"
+                      v-model="selectedNode.data.config[key]"
+                      size="small"
+                      :placeholder="field.placeholder"
+                      controls-position="right"
+                      :min="field.min || 0"
+                    />
+                    <el-select
+                      v-else-if="field.type === 'enum'"
+                      v-model="selectedNode.data.config[key]"
+                      size="small"
+                      :placeholder="field.placeholder"
+                    >
+                      <el-option
+                        v-for="opt in (field.options || [])"
+                        :key="opt"
+                        :label="opt"
+                        :value="opt"
+                      />
+                    </el-select>
+                    <el-input
+                      v-else-if="field.type === 'textarea'"
+                      v-model="selectedNode.data.config[key]"
+                      type="textarea"
+                      :rows="3"
+                      size="small"
+                      :placeholder="field.placeholder"
+                    />
+                    <el-switch
+                      v-else-if="field.type === 'boolean'"
+                      v-model="selectedNode.data.config[key]"
+                      size="small"
+                    />
+                    <!-- 未知类型用文本输入框兜底 -->
+                    <el-input
+                      v-else
+                      v-model="selectedNode.data.config[key]"
+                      size="small"
+                      placeholder="请输入"
+                    />
+                  </template>
                 </el-form-item>
               </template>
               <el-form-item>
@@ -250,7 +261,7 @@ const groupedNodes = computed(() => {
   return groups
 })
 
-const activeCategories = ref('FILTER')
+const activeCategories = ref('AI')
 const nodeCount = computed(() => getNodes.value.filter(n => n.type === 'custom-node').length)
 const edgeCount = computed(() => getEdges.value.length)
 
@@ -274,8 +285,10 @@ onMounted(async () => {
     allNodeTypes.value = res.data
     if (chainId) {
       await loadChain(chainId)
-    } else {
-      loadExample()
+    }
+    // 如果有节点，适应视图
+    if (getNodes.value.length > 0) {
+      fitView()
     }
   } catch (e) {
     ElMessage.error('加载节点类型失败')
@@ -316,40 +329,73 @@ const loadChain = async (id: string) => {
 // ===== 获取节点配置Schema =====
 const getNodeConfigSchema = (type: string) => {
   const found = allNodeTypes.value.find(n => n.type === type)
-  return found?.configSchema || {}
+  if (!found) return {}
+
+  const schema = found.configSchema
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return {}
+  }
+
+  const safeSchema: Record<string, any> = {}
+  for (const [key, field] of Object.entries(schema)) {
+    if (field && typeof field === 'object' && !Array.isArray(field)) {
+      safeSchema[key] = {
+        ...field,
+        required: (field as any).required ?? false
+      }
+    } else {
+      safeSchema[key] = {
+        type: 'string',
+        placeholder: '',
+        required: false
+      }
+    }
+  }
+  return safeSchema
 }
 
 // ===== 拖拽 =====
 const onDragStart = (event: DragEvent, node: any) => {
-  event.dataTransfer?.setData('application/json', JSON.stringify(node))
-  event.dataTransfer!.effectAllowed = 'move'
+  const payload = JSON.stringify(node)
+
+  console.log(payload)
+
+  event.dataTransfer?.setData('application/json', payload)
 }
 
 const onDragEnd = () => {}
 
+const onDragOver = (event: DragEvent) => {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
 const onDrop = (event: DragEvent) => {
   event.preventDefault()
-  const raw = event.dataTransfer?.getData('application/json')
+  const raw = event.dataTransfer?.getData('application/json') || event.dataTransfer?.getData('text/plain')
   if (!raw) return
 
   const nodeData = JSON.parse(raw)
-  const canvasRect = canvasRef.value?.getBoundingClientRect()
-  const x = event.clientX - (canvasRect?.left || 0) - 50
-  const y = event.clientY - (canvasRect?.top || 0) - 20
+  // 使用固定位置，便于调试
+  const x = 200
+  const y = 200
 
   const newNode = {
     id: `node_${Date.now()}`,
     type: 'custom-node',
-    position: { x: Math.max(0, x), y: Math.max(0, y) },
+    position: { x, y },
     data: {
-      label: nodeData.name,
+      label: nodeData.name || nodeData.type,
       type: nodeData.type,
       config: {},
-      configSchema: nodeData.configSchema
+      configSchema: nodeData.configSchema || getNodeConfigSchema(nodeData.type) || {}
     }
   }
-
   addNodes([newNode])
+  // 添加后自动适应视图
+  fitView()
 }
 
 // ===== 节点点击 =====

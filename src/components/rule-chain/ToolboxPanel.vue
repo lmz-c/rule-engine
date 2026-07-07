@@ -2,111 +2,180 @@
   <div class="toolbox-panel">
     <div class="toolbox-header">
       <span>📦 组件工具箱</span>
+
       <el-button
-        size="small"
         text
+        size="small"
         @click="emit('toggle')"
       >
-        <el-icon><DArrowLeft v-if="open" /><DArrowRight v-else /></el-icon>
+        <el-icon>
+          <DArrowLeft v-if="open" />
+          <DArrowRight v-else />
+        </el-icon>
       </el-button>
     </div>
 
-    <div v-show="open" class="toolbox-body">
-      <el-collapse v-model="activeCategories" accordion>
-        <el-collapse-item
-          v-for="(nodes, category) in groupedNodes"
-          :key="category"
-          :name="category"
+    <div
+      v-show="open"
+      class="toolbox-body"
+    >
+      <div
+        v-for="(nodes, category) in groupedNodes"
+        :key="category"
+        class="category"
+      >
+        <!-- 分类标题 -->
+        <div
+          class="category-header"
+          @click="toggleCategory(category)"
         >
-          <template #title>
-            <span class="category-title">
-              <span class="category-dot" :style="{ background: getCategoryColor(category) }"></span>
+          <div class="header-left">
+            <span
+              class="category-dot"
+              :style="{ background: getCategoryColor(category) }"
+            />
+
+            <span class="category-name">
               {{ getCategoryName(category) }}
-              <span class="category-count">{{ nodes.length }}</span>
             </span>
-          </template>
-          <div
-            v-for="node in nodes"
-            :key="node.type"
-            class="node-item"
-            draggable="true"
-            @dragstart="handleDragStart($event, node)"
-            @dragend="handleDragEnd"
-          >
-            <span class="node-dot" :style="{ background: node.color || '#409EFF' }"></span>
-            <span class="node-name">{{ node.name }}</span>
-            <span class="node-badge">{{ node.type }}</span>
+
+            <span class="category-count">
+              {{ nodes.length }}
+            </span>
           </div>
-        </el-collapse-item>
-      </el-collapse>
+
+          <el-icon
+            class="arrow"
+            :class="{ open: expandMap[category] }"
+          >
+            <ArrowRight />
+          </el-icon>
+        </div>
+
+        <!-- 分类内容 -->
+        <transition name="expand">
+          <div
+            v-show="expandMap[category]"
+            class="category-content"
+          >
+            <div
+              v-for="node in nodes"
+              :key="node.type"
+              class="node-item"
+              draggable="true"
+              @dragstart="handleDragStart($event, node)"
+              @dragend="handleDragEnd"
+            >
+              <span
+                class="node-dot"
+                :style="{ background: node.color }"
+              />
+
+              <div class="node-info">
+                <div class="node-name">
+                  {{ node.name }}
+                </div>
+
+                <div class="node-type">
+                  {{ node.type }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { DArrowLeft, DArrowRight } from '@element-plus/icons-vue'
+import { computed, reactive } from "vue";
+import {
+  ArrowRight,
+  DArrowLeft,
+  DArrowRight
+} from "@element-plus/icons-vue";
 
 const props = defineProps<{
-  nodeTypes: any[]
-  open?: boolean
-}>()
+  nodeTypes: any[];
+  open?: boolean;
+}>();
 
 const emit = defineEmits<{
-  (e: 'toggle'): void
-  (e: 'drag-start', event: DragEvent, node: any): void
-  (e: 'drag-end'): void
-}>()
+  (e: "toggle"): void;
+  (e: "drag-start", event: DragEvent, node: any): void;
+  (e: "drag-end"): void;
+}>();
 
-const activeCategories = ref('FILTER')
-
-// 按分类分组
 const groupedNodes = computed(() => {
-  const groups: Record<string, any[]> = {}
-  props.nodeTypes.forEach(node => {
-    const category = node.category || 'OTHER'
-    if (!groups[category]) groups[category] = []
-    groups[category].push(node)
-  })
-  return groups
-})
+  const map: Record<string, any[]> = {};
 
-// 分类名称映射
+  props.nodeTypes.forEach((n) => {
+    const key = n.category || "OTHER";
+
+    if (!map[key]) map[key] = [];
+
+    map[key].push(n);
+  });
+
+  return map;
+});
+
+const expandMap = reactive<Record<string, boolean>>({
+  FILTER: true,
+  ACTION: true,
+  TRANSFORM: true,
+  FLOW: true,
+  EXTERNAL: true,
+  AI: true
+});
+
+const toggleCategory = (category: string) => {
+  expandMap[category] = !expandMap[category];
+};
+
 const getCategoryName = (category: string) => {
   const map: Record<string, string> = {
-    FILTER: '过滤组件',
-    ACTION: '动作组件',
-    TRANSFORM: '变换组件',
-    FLOW: '流程组件',
-    EXTERNAL: '外部组件',
-    AI: 'AI组件'
-  }
-  return map[category] || category
-}
+    FILTER: "过滤组件",
+    ACTION: "动作组件",
+    TRANSFORM: "转换组件",
+    FLOW: "流程组件",
+    EXTERNAL: "外部组件",
+    AI: "AI组件"
+  };
 
-// 分类颜色
+  return map[category] || category;
+};
+
 const getCategoryColor = (category: string) => {
   const map: Record<string, string> = {
-    FILTER: '#409EFF',
-    ACTION: '#E6A23C',
-    TRANSFORM: '#67C23A',
-    FLOW: '#F56C6C',
-    EXTERNAL: '#909399',
-    AI: '#9B59B6'
-  }
-  return map[category] || '#409EFF'
-}
+    FILTER: "#409EFF",
+    ACTION: "#E6A23C",
+    TRANSFORM: "#67C23A",
+    FLOW: "#F56C6C",
+    EXTERNAL: "#909399",
+    AI: "#9B59B6"
+  };
 
-// 拖拽事件
+  return map[category] || "#409EFF";
+};
+
 const handleDragStart = (event: DragEvent, node: any) => {
-  event.dataTransfer?.setData('application/json', JSON.stringify(node))
-  event.dataTransfer!.effectAllowed = 'move'
-  emit('drag-start', event, node)
-}
+  if (!event.dataTransfer) return;
+
+  event.dataTransfer.effectAllowed = "copy";
+
+  event.dataTransfer.setData(
+    "application/json",
+    JSON.stringify(node)
+  );
+
+  emit("drag-start", event, node);
+};
 
 const handleDragEnd = () => {
-  emit('drag-end')
-}
+  emit("drag-end");
+};
 </script>
 
 <style scoped>
@@ -115,83 +184,89 @@ const handleDragEnd = () => {
   flex-direction: column;
   height: 100%;
   background: #fff;
-  border-right: 1px solid #e4e7ed;
-  overflow: hidden;
-  flex-shrink: 0;
+  border-right: 1px solid #ebeef5;
 }
 
 .toolbox-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e4e7ed;
+  height: 54px;
+  padding: 0 14px;
   font-weight: 600;
-  font-size: 14px;
-  flex-shrink: 0;
-  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .toolbox-body {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
 }
 
-:deep(.el-collapse) {
-  border: none;
+.category {
+  border-bottom: 1px solid #f3f3f3;
 }
 
-:deep(.el-collapse-item__header) {
-  font-size: 13px;
-  padding: 0 16px;
-  height: 34px;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
+.category-header {
+  height: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 0 14px;
+  transition: .2s;
 }
 
-:deep(.el-collapse-item__wrap) {
-  border-bottom: none;
+.category-header:hover {
+  background: #f8f9fb;
 }
 
-:deep(.el-collapse-item__content) {
-  padding: 4px 8px;
-}
-
-.category-title {
+.header-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 500;
 }
 
 .category-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  flex-shrink: 0;
+}
+
+.category-name {
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .category-count {
+  color: #999;
   font-size: 11px;
-  color: #c0c4cc;
-  font-weight: 400;
+}
+
+.arrow {
+  transition: .2s;
+}
+
+.arrow.open {
+  transform: rotate(90deg);
+}
+
+.category-content {
+  padding: 6px;
 }
 
 .node-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  margin: 2px 0;
+  gap: 10px;
+  padding: 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
   cursor: grab;
-  border-radius: 4px;
-  font-size: 13px;
-  transition: all 0.15s;
+  transition: .2s;
 }
 
 .node-item:hover {
-  background: #ecf5ff;
+  background: #eef5ff;
 }
 
 .node-item:active {
@@ -199,24 +274,41 @@ const handleDragEnd = () => {
 }
 
 .node-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  flex-shrink: 0;
+}
+
+.node-info {
+  display: flex;
+  flex-direction: column;
 }
 
 .node-name {
-  flex: 1;
   font-size: 13px;
   color: #303133;
 }
 
-.node-badge {
-  font-size: 10px;
-  color: #c0c4cc;
-  background: #f4f4f5;
-  padding: 1px 6px;
-  border-radius: 3px;
+.node-type {
+  font-size: 11px;
+  color: #999;
   font-family: monospace;
+}
+
+.expand-enter-active,
+.expand-leave-active {
+  transition: all .2s;
+}
+
+.expand-enter-from,
+.expand-leave-to {
+  opacity: 0;
+  max-height: 0;
+}
+
+.expand-enter-to,
+.expand-leave-from {
+  opacity: 1;
+  max-height: 500px;
 }
 </style>
