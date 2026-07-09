@@ -10,16 +10,18 @@
     <div class="node-label">{{ data?.label || type }}</div>
     <div class="node-type">{{ type }}</div>
     <Handle
-    id="target"
-    type="target"
-    :position="Position.Left"
-/>
+      id="target"
+      type="target"
+      :position="Position.Left"
+      :connectable="true"
+    />
 
-<Handle
-    id="source"
-    type="source"
-    :position="Position.Right"
-/>
+    <Handle
+      id="source"
+      type="source"
+      :position="Position.Right"
+      :connectable="true"
+    />
   </div>
 </template>
 
@@ -40,7 +42,8 @@ import {
   Message,
   Document,
   Collection,
-  TrendCharts
+  TrendCharts,
+  Upload 
 } from '@element-plus/icons-vue'
 
 // ===== 使用 VueFlow 的 NodeProps 类型 =====
@@ -108,7 +111,8 @@ const getIcon = (type: string) => {
     AI_LLM: Cpu,
     AI_KNOWLEDGE: Document,
     AI_MCP_TOOL: Monitor,
-    AI_AGENT: Cpu
+    AI_AGENT: Cpu,
+    INPUT: Upload
   }
   return iconMap[type] || Filter
 }

@@ -1,5 +1,11 @@
 import request from '@/utils/request'
 
+
+// 绑定设备到规则链
+export const bindDevice = (data: { deviceId: string; chainId: string }): Promise<{ code: number; msg: string; data?: any }> => {
+  return request.post('/api/bind/device', data)
+}
+
 // ===== 设备管理 =====
 export const getDeviceList = (params?: any) => {
   return request.get('/api/device/list', { params })
@@ -37,6 +43,6 @@ export const deleteProduct = (id: number) => {
 }
 
 // ===== 模拟设备上报 =====
-export const simulateDeviceReport = (deviceId: string, payload: any) => {
+export const simulateDeviceReport = (deviceId: string, payload: any): Promise<{ code: number; msg: string; data?: any }> => {
   return request.post('/api/simulate/device', { deviceId, payload })
 }

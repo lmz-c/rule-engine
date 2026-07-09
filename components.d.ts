@@ -15,6 +15,7 @@ declare module 'vue' {
     ElCollapse: typeof import('element-plus/es')['ElCollapse']
     ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']
     ElContainer: typeof import('element-plus/es')['ElContainer']
+    ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
     ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']
     ElDropdownMenu: typeof import('element-plus/es')['ElDropdownMenu']
@@ -39,6 +40,8 @@ declare module 'vue' {
     PropertyPanel: typeof import('./src/components/rule-chain/PropertyPanel.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    RunDialog: typeof import('./src/components/rule-chain/RunDialog.vue')['default']
+    RunDialogManual: typeof import('./src/components/rule-chain/RunDialogManual.vue')['default']
     ToolboxPanel: typeof import('./src/components/rule-chain/ToolboxPanel.vue')['default']
   }
   export interface ComponentCustomProperties {

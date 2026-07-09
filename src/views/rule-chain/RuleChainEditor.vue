@@ -37,8 +37,9 @@
       <!-- 顶部工具栏 -->
       <div class="canvas-toolbar">
         <el-button-group>
-          <el-button size="small" type="primary" @click="handleSave">💾 保存</el-button>
-          <el-button size="small" @click="handleLoadExample">📂 示例</el-button>
+          <el-button size="small" type="primary" @click="handleSave">保存</el-button>
+          <el-button size="small" @click="handleLoadExample">示例</el-button>
+          <el-button size="small" @click="showRunDialog">运行</el-button>
           <el-button size="small" @click="handleClear">🗑️ 清空</el-button>
         </el-button-group>
         <div class="canvas-info">
@@ -60,6 +61,7 @@
           @node-drag-stop="onNodeDragStop"
           @drop="onDrop" 
           @dragover="onDragOver"
+          @init="onInit"
         >
           <Background pattern-color="#ddd" :gap="20" />
           <Controls position="bottom-right" />
@@ -164,6 +166,13 @@
         <div v-else class="empty-tip">点击画布上的节点进行配置</div>
       </div>
     </div>
+    <!-- 运行对话框 -->
+    <RunDialog
+      v-show="runDialogVisible"
+      v-model="runDialogVisible"
+      :chain-id="currentChainId"
+      @success="onRunSuccess"
+    />
   </div>
 </template>
 
@@ -177,6 +186,10 @@ import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { getNodeTypes, saveRuleChain, getRuleChain } from '@/api/ruleChain'
 import CustomNode from '@/components/rule-chain/CustomNode.vue'
+import { nextTick } from 'vue'
+import RunDialog from '@/components/rule-chain/RunDialog.vue'
+// import RunDialogManual from '@/components/rule-chain/RunDialogManual.vue'
+
 
 const route = useRoute()
 const router = useRouter()
@@ -195,6 +208,8 @@ const chainId = route.params.chainId as string
 const minWidth = 240
 const maxWidth = 600
 const isResizing = ref(false)
+const runDialogVisible = ref(false)
+const currentChainId = ref<string>('')
 
 // ===== VueFlow =====
 const { nodes, edges, addNodes, addEdges, getNodes, getEdges, updateNode, fitView, removeNodes, removeEdges ,screenToFlowCoordinate} = useVueFlow()
@@ -225,6 +240,11 @@ const onResize = (e: MouseEvent) => {
   }
 }
 
+const onInit = (instance: any) => {
+  console.log(instance,223)
+
+  console.log(instance.getNodes(),224)
+}
 const stopResize = () => {
   isResizing.value = false
   document.body.style.cursor = ''
@@ -286,6 +306,7 @@ onMounted(async () => {
     } else {
       loadExample()
     }
+    await nextTick()
   } catch (e) {
     ElMessage.error('加载节点类型失败')
   }
@@ -390,23 +411,34 @@ const onNodeClick = (event: any) => {
 
 // ===== 连线 =====
 const onConnect = (connection: any) => {
-
+  console.log('connect', connection)
   const edge = {
     id: `e_${Date.now()}`,
+
     source: connection.source,
     target: connection.target,
 
-    // 先默认 Success
+    sourceHandle: connection.sourceHandle,
+    targetHandle: connection.targetHandle,
+
+    type: 'default',
+
     label: 'Success',
 
     data: {
       relation: 'Success'
-    },
-
-    animated: false
+    }
   }
 
   addEdges([edge])
+  console.log('当前所有边', getEdges.value)
+  console.log(getNodes.value)
+  console.log(
+    JSON.stringify(getEdges.value, null, 2)
+  )
+  console.log(
+    JSON.stringify(getNodes.value[0], null, 2)
+  )
 }
 
 const onEdgeClick = (event: any) => {
@@ -435,57 +467,39 @@ const handleSave = async () => {
     }))
 
     const data = {
-      chainId: chainId || `CHAIN_${Date.now()}`,
       name: '规则链_' + new Date().toLocaleString(),
       status: 1,
       configJson: JSON.stringify({ nodes, connections })
     }
 
-    await saveRuleChain(data)
+    const res = await saveRuleChain(data)
+    localStorage.setItem('lastSavedRuleChain', res.data)
     ElMessage.success('保存成功')
+    return res.data
   } catch (e) {
     ElMessage.error('保存失败')
+    return null
   }
 }
 
-// ===== 示例数据 =====
+// ===== 示例数据 输入节点=====
 const loadExample = () => {
   const nodes = [
     {
-      id: 'n1',
+      id: 'input_1',
       type: 'custom-node',
-      position: { x: 60, y: 200 },
+      position: { x: 200, y: 200 },
       data: {
-        label: '阈值过滤',
-        type: 'FILTER_THRESHOLD',
-        config: { key: 'temp', operator: '>', value: 80 },
-        configSchema: allNodeTypes.value.find(n => n.type === 'FILTER_THRESHOLD')?.configSchema || {}
-      }
-    },
-    {
-      id: 'n2',
-      type: 'custom-node',
-      position: { x: 380, y: 200 },
-      data: {
-        label: '创建告警',
-        type: 'ACTION_ALERT',
-        config: { severity: 'CRITICAL' },
-        configSchema: allNodeTypes.value.find(n => n.type === 'ACTION_ALERT')?.configSchema || {}
+        label: '输入',
+        type: 'INPUT',
+        config: {
+          source: 'MQTT'
+        },
+        configSchema: {}   // 无配置表单
       }
     }
   ]
-
-  const edges = [
-    {
-      id: 'e1',
-      source: 'n1',
-      sourceHandle: 'Success',
-      target: 'n2'
-    }
-  ]
-
   addNodes(nodes)
-  addEdges(edges)
 }
 
 const handleLoadExample = loadExample
@@ -494,15 +508,18 @@ const handleLoadExample = loadExample
 const handleClear = async () => {
   try {
     await ElMessageBox.confirm('确定要清空画布吗？', '提示', { type: 'warning' })
-    const nodes = getNodes.value
-    const edges = getEdges.value
-    nodes.forEach(n => { if (n.type === 'custom-node') removeNodes([n.id]) })
-    edges.forEach(e => removeEdges([e.id]))
+    const currentNodes = getNodes.value
+    // 保留输入节点
+    const inputNode = currentNodes.find(n => n.data?.type === 'INPUT')
+    const nodesToRemove = currentNodes.filter(n => n !== inputNode)
+    nodesToRemove.forEach(n => removeNodes([n.id]))
+    edges.value = []
     selectedNode.value = null
     ElMessage.success('已清空')
   } catch {}
 }
-
+// 执行代码
+const handleExecute = () =>{}
 // ===== 视图控制 =====
 const handleZoomIn = () => {
   const zoom = fitView() // 简化为适应视图
@@ -537,6 +554,42 @@ const toggleToolbox = () => {
 const toggleProperty = () => {
   propertyOpen.value = !propertyOpen.value
   propertyWidth.value = propertyOpen.value ? 320 : 0
+}
+
+// ===== 显示运行对话框 =====
+const showRunDialog = async () => {
+  if (getNodes.value.filter(n => n.type === 'custom-node').length === 0) {
+    ElMessage.warning('画布为空，请先添加节点')
+    return
+  }
+  
+  try {
+    console.log('Opening dialog...')
+    
+    if (localStorage.getItem('lastSavedRuleChain')) {
+      currentChainId.value = localStorage.getItem('lastSavedRuleChain') as string
+      console.log('Chain ID set:', currentChainId.value)
+      // 直接设置，不需要 nextTick
+      runDialogVisible.value = true
+      console.log('Dialog visibility set to true')
+      return
+    }
+    
+    const res = await handleSave()
+    if (res) {
+      currentChainId.value = res
+      runDialogVisible.value = true
+    }
+  } catch (e) {
+    console.error('Error in showRunDialog:', e)
+    ElMessage.error('保存失败，请检查规则链配置')
+  }
+}
+
+
+// 运行成功回调
+const onRunSuccess = () => {
+  ElMessage.success('规则链执行成功，请查看响应体')
 }
 </script>
 
