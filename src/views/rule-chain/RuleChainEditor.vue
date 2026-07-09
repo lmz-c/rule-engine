@@ -173,6 +173,52 @@
       :chain-id="currentChainId"
       @success="onRunSuccess"
     />
+    <el-dialog
+        v-model="relationDialogVisible"
+        title="连线选择"
+        width="420px"
+    >
+
+        <el-form>
+
+            <el-form-item label="链接标签">
+
+                <el-select
+                    v-model="selectedRelation"
+                    style="width:100%"
+                >
+
+                    <el-option
+                        v-for="item in relationOptions"
+                        :key="item"
+                        :label="item"
+                        :value="item"
+                    />
+
+                </el-select>
+
+            </el-form-item>
+
+        </el-form>
+
+        <template #footer>
+
+            <el-button
+                @click="handleRelationCancel"
+            >
+                取消
+            </el-button>
+
+            <el-button
+                type="primary"
+                @click="handleRelationConfirm"
+            >
+                保存
+            </el-button>
+
+        </template>
+
+    </el-dialog>
   </div>
 </template>
 
@@ -213,6 +259,16 @@ const runDialogVisible = ref(false)
 const currentChainId = ref<string>('')
 const nodes = ref<Node[]>([])
 const edges = ref<Edge[]>([])
+// ===== 连线选择 =====
+const relationDialogVisible = ref(false)
+const pendingConnection = ref<any>(null)
+const selectedRelation = ref('Success')
+const relationOptions = [
+  'Success',
+  'Failure',
+  'Telemetry',
+  'Attributes'
+]
 
 // ===== VueFlow =====
 const {fitView,screenToFlowCoordinate} = useVueFlow()
@@ -336,10 +392,21 @@ const loadChain = async (id: string) => {
       }
     }))
     const edges = config.connections.map((c: any) => ({
-      id: `e_${c.from}_${c.to}`,
-      source: c.from,
-      sourceHandle: c.label || 'Success',
-      target: c.to
+      id:`e_${c.from}_${c.to}`,
+
+      source:c.from,
+
+      target:c.to,
+
+      type:'default',
+
+      label:c.label,
+
+      data:{
+
+          relation:c.label
+
+      }
     }))
     nodes.value.push(...nodes)
     edges.value.push(...edges)
@@ -416,26 +483,14 @@ const onNodeClick = (event: any) => {
 
 // ===== 连线 =====
 const onConnect = (connection: any) => {
-  console.log('connect', connection)
-  const edge = {
-    id: `e_${Date.now()}`,
 
-    source: connection.source,
-    target: connection.target,
+  console.log(connection)
 
-    sourceHandle: connection.sourceHandle,
-    targetHandle: connection.targetHandle,
+  pendingConnection.value = connection
 
-    type: 'default',
+  selectedRelation.value = 'Success'
 
-    label: 'Success',
-
-    data: {
-      relation: 'Success'
-    }
-  }
-
-  edges.value.push(edge)
+  relationDialogVisible.value = true
 }
 
 const onEdgeClick = (event: any) => {
@@ -447,7 +502,7 @@ const onNodeDragStop = (event: any) => {}
 // ===== 保存 =====
 const handleSave = async () => {
   try {
-    const saveNodes  = nodes.value
+    const saveNodes  = (nodes.value as any[])
       .filter(n => n.type === 'custom-node')
       .map((n: any) => ({
         id: n.id,
@@ -457,10 +512,14 @@ const handleSave = async () => {
         position: n.position
       }))
 
-    const connections = edges.value.map((e: any) => ({
-      from: e.source,
-      label: e.sourceHandle || 'Success',
-      to: e.target
+    const connections = edges.value.map((e:any)=>({
+
+        from:e.source,
+
+        label:e.data?.relation || e.label,
+
+        to:e.target
+
     }))
 
     const data = {
@@ -627,6 +686,43 @@ const showRunDialog = async () => {
 // 运行成功回调
 const onRunSuccess = () => {
   ElMessage.success('规则链执行成功，请查看响应体')
+}
+
+const handleRelationConfirm = () => {
+
+  if (!pendingConnection.value) return
+
+  const c = pendingConnection.value
+
+  edges.value.push({
+
+    id: `e_${Date.now()}`,
+
+    source: c.source,
+
+    target: c.target,
+
+    type: 'default',
+
+    label: selectedRelation.value,
+
+    data: {
+
+      relation: selectedRelation.value
+
+    }
+
+  })
+
+  pendingConnection.value = null
+
+  relationDialogVisible.value = false
+}
+const handleRelationCancel = () => {
+
+  pendingConnection.value = null
+
+  relationDialogVisible.value = false
 }
 </script>
 

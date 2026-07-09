@@ -212,8 +212,8 @@ const loadData = async () => {
       ...searchForm
     }
     const res = await getAlertList(params)
-    tableData.value = res.data?.list || []
-    total.value = res.data?.total || 0
+    tableData.value = res.data || []
+    total.value = res.data.length || 0
 
     // 统计待处理数量
     pendingCount.value = tableData.value.filter((item: any) => item.status === 'PENDING').length

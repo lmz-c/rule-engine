@@ -226,8 +226,11 @@ const loadData = async () => {
       params.endTime = dateRange.value[1]
     }
     const res = await getAuditLogs(params)
-    tableData.value = res.data?.list || []
-    total.value = res.data?.total || 0
+    tableData.value = res.data || []
+    total.value = res.data.length || 0
+    console.log(res, tableData.value, total.value);
+    
+    
   } catch (e) {
     ElMessage.error('加载审计日志失败')
   } finally {
