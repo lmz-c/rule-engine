@@ -34,13 +34,13 @@
 
     <!-- 中间：画布 -->
     <div class="canvas-wrapper">
-      <!-- 顶部工具栏 -->
+      <!-- 顶部工具栏
+        <el-button size="small" @click="handleLoadExample">示例</el-button> -->
       <div class="canvas-toolbar">
         <el-button-group>
           <el-button size="small" type="primary" @click="handleSave">保存</el-button>
-          <el-button size="small" @click="handleLoadExample">示例</el-button>
           <el-button size="small" @click="showRunDialog">运行</el-button>
-          <el-button size="small" @click="handleClear">🗑️ 清空</el-button>
+          <el-button size="small" @click="handleClear">清空</el-button>
         </el-button-group>
         <div class="canvas-info">
           <span>节点: {{ nodeCount }}</span>
@@ -85,9 +85,9 @@
         <div class="property-section">
           <div class="section-title">系统操作</div>
           <div class="section-content">
-            <el-button size="small" @click="handleZoomIn" style="width:100%;margin-bottom:4px">🔍 放大</el-button>
-            <el-button size="small" @click="handleZoomOut" style="width:100%;margin-bottom:4px">🔍 缩小</el-button>
-            <el-button size="small" @click="handleFitView" style="width:100%;margin-bottom:4px">📐 适应画布</el-button>
+            <el-button size="small" @click="handleZoomIn" style="width:100%;margin-bottom:4px;display:block;margin-left: 12px;">放大</el-button>
+            <el-button size="small" @click="handleZoomOut" style="width:100%;margin-bottom:4px;display:block;">缩小</el-button>
+            <el-button size="small" @click="handleFitView" style="width:100%;margin-bottom:4px;display:block;">适应画布</el-button>
           </div>
         </div>
 
@@ -188,7 +188,8 @@ import { getNodeTypes, saveRuleChain, getRuleChain } from '@/api/ruleChain'
 import CustomNode from '@/components/rule-chain/CustomNode.vue'
 import { nextTick } from 'vue'
 import RunDialog from '@/components/rule-chain/RunDialog.vue'
-// import RunDialogManual from '@/components/rule-chain/RunDialogManual.vue'
+import type { Node, Edge } from '@vue-flow/core'
+
 
 
 const route = useRoute()
@@ -210,9 +211,11 @@ const maxWidth = 600
 const isResizing = ref(false)
 const runDialogVisible = ref(false)
 const currentChainId = ref<string>('')
+const nodes = ref<Node[]>([])
+const edges = ref<Edge[]>([])
 
 // ===== VueFlow =====
-const { nodes, edges, addNodes, addEdges, getNodes, getEdges, updateNode, fitView, removeNodes, removeEdges ,screenToFlowCoordinate} = useVueFlow()
+const {fitView,screenToFlowCoordinate} = useVueFlow()
 const nodeTypes = {
   'custom-node': CustomNode
 }
@@ -280,9 +283,11 @@ const activeCategories = ref([
   'EXTERNAL',
   'AI'
 ])
-const nodeCount = computed(() => getNodes.value.filter(n => n.type === 'custom-node').length)
-const edgeCount = computed(() => getEdges.value.length)
+const nodeCount = computed(() => nodes.value.length)
 
+const edgeCount = computed(() =>
+  edges.value.length
+)
 // ===== 获取分类名称 =====
 const getCategoryName = (category: string) => {
   const map: Record<string, string> = {
@@ -336,8 +341,8 @@ const loadChain = async (id: string) => {
       sourceHandle: c.label || 'Success',
       target: c.to
     }))
-    addNodes(nodes)
-    addEdges(edges)
+    nodes.value.push(...nodes)
+    edges.value.push(...edges)
   } catch (e) {
     ElMessage.error('加载规则链失败')
   }
@@ -392,7 +397,7 @@ const onDrop = (event: DragEvent) => {
     }
   }
 
-  addNodes([newNode])
+  nodes.value.push(newNode)
 }
 
 const onDragOver = (event: DragEvent) => {
@@ -430,15 +435,7 @@ const onConnect = (connection: any) => {
     }
   }
 
-  addEdges([edge])
-  console.log('当前所有边', getEdges.value)
-  console.log(getNodes.value)
-  console.log(
-    JSON.stringify(getEdges.value, null, 2)
-  )
-  console.log(
-    JSON.stringify(getNodes.value[0], null, 2)
-  )
+  edges.value.push(edge)
 }
 
 const onEdgeClick = (event: any) => {
@@ -450,7 +447,7 @@ const onNodeDragStop = (event: any) => {}
 // ===== 保存 =====
 const handleSave = async () => {
   try {
-    const nodes = getNodes.value
+    const saveNodes  = nodes.value
       .filter(n => n.type === 'custom-node')
       .map((n: any) => ({
         id: n.id,
@@ -460,7 +457,7 @@ const handleSave = async () => {
         position: n.position
       }))
 
-    const connections = getEdges.value.map((e: any) => ({
+    const connections = edges.value.map((e: any) => ({
       from: e.source,
       label: e.sourceHandle || 'Success',
       to: e.target
@@ -469,7 +466,7 @@ const handleSave = async () => {
     const data = {
       name: '规则链_' + new Date().toLocaleString(),
       status: 1,
-      configJson: JSON.stringify({ nodes, connections })
+      configJson: JSON.stringify({ nodes: saveNodes, connections })
     }
 
     const res = await saveRuleChain(data)
@@ -484,7 +481,7 @@ const handleSave = async () => {
 
 // ===== 示例数据 输入节点=====
 const loadExample = () => {
-  const nodes = [
+  const exampleNodes = [
     {
       id: 'input_1',
       type: 'custom-node',
@@ -499,7 +496,7 @@ const loadExample = () => {
       }
     }
   ]
-  addNodes(nodes)
+  nodes.value = exampleNodes
 }
 
 const handleLoadExample = loadExample
@@ -507,14 +504,23 @@ const handleLoadExample = loadExample
 // ===== 清空 =====
 const handleClear = async () => {
   try {
-    await ElMessageBox.confirm('确定要清空画布吗？', '提示', { type: 'warning' })
-    const currentNodes = getNodes.value
-    // 保留输入节点
-    const inputNode = currentNodes.find(n => n.data?.type === 'INPUT')
-    const nodesToRemove = currentNodes.filter(n => n !== inputNode)
-    nodesToRemove.forEach(n => removeNodes([n.id]))
+    await ElMessageBox.confirm('确定要清空画布吗？', '提示', {
+      type: 'warning'
+    })
+
+    // 找到输入节点
+    const inputNode = nodes.value.find(
+      n => n.data?.type === 'INPUT'
+    )
+
+    // 只保留输入节点
+    nodes.value = inputNode ? [inputNode] : []
+
+    // 清空所有连线
     edges.value = []
+
     selectedNode.value = null
+
     ElMessage.success('已清空')
   } catch {}
 }
@@ -536,11 +542,31 @@ const handleFitView = () => {
 // ===== 删除节点 =====
 const handleDeleteNode = async () => {
   if (!selectedNode.value) return
+
   try {
-    await ElMessageBox.confirm('确定要删除此节点吗？', '提示', { type: 'warning' })
-    removeNodes([selectedNode.value.id])
+    await ElMessageBox.confirm(
+      '确定要删除此节点吗？',
+      '提示',
+      { type: 'warning' }
+    )
+
+    const nodeId = selectedNode.value.id
+
+    // 删除节点
+    nodes.value = nodes.value.filter(
+      node => node.id !== nodeId
+    )
+
+    // 删除关联连线
+    edges.value = edges.value.filter(
+      edge =>
+        edge.source !== nodeId &&
+        edge.target !== nodeId
+    )
+
     selectedNode.value = null
     configSchema.value = {}
+
     ElMessage.success('已删除')
   } catch {}
 }
@@ -558,30 +584,41 @@ const toggleProperty = () => {
 
 // ===== 显示运行对话框 =====
 const showRunDialog = async () => {
-  if (getNodes.value.filter(n => n.type === 'custom-node').length === 0) {
+
+  if (
+    nodes.value.filter(
+      node => node.type === 'custom-node'
+    ).length === 0
+  ) {
     ElMessage.warning('画布为空，请先添加节点')
     return
   }
-  
+
   try {
+
     console.log('Opening dialog...')
-    
+
     if (localStorage.getItem('lastSavedRuleChain')) {
-      currentChainId.value = localStorage.getItem('lastSavedRuleChain') as string
-      console.log('Chain ID set:', currentChainId.value)
-      // 直接设置，不需要 nextTick
+
+      currentChainId.value =
+        localStorage.getItem('lastSavedRuleChain')!
+
       runDialogVisible.value = true
-      console.log('Dialog visibility set to true')
+
       return
     }
-    
+
     const res = await handleSave()
+
     if (res) {
       currentChainId.value = res
       runDialogVisible.value = true
     }
+
   } catch (e) {
-    console.error('Error in showRunDialog:', e)
+
+    console.error(e)
+
     ElMessage.error('保存失败，请检查规则链配置')
   }
 }
