@@ -176,7 +176,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, WarningFilled, Warning, InfoFilled, CircleCheck } from '@element-plus/icons-vue'
-import { getAlertList, clearAlert, getAlertStatistics } from '@/api/alert'
+import { getAlertList, clearAlert, getAlertStatistics, getAlertByDevice } from '@/api/alert'
 import dayjs from 'dayjs'
 
 // ===== 状态 =====
@@ -206,14 +206,23 @@ const statistics = ref({
 const loadData = async () => {
   loading.value = true
   try {
-    const params = {
-      page: pageNum.value,
-      size: pageSize.value,
-      ...searchForm
+    let res
+    // 如果输入了设备ID，调用按设备查询接口
+    if (searchForm.deviceId) {
+      res = await getAlertByDevice(searchForm.deviceId)
+      tableData.value = res.data || []
+      total.value = tableData.value.length
+      
+    } else {
+      const params = {
+        page: pageNum.value,
+        size: pageSize.value,
+        ...searchForm
+      }
+      res = await getAlertList(params)
+      tableData.value = res.data || []
+      total.value = res.data.length || 0
     }
-    const res = await getAlertList(params)
-    tableData.value = res.data || []
-    total.value = res.data.length || 0
 
     // 统计待处理数量
     pendingCount.value = tableData.value.filter((item: any) => item.status === 'PENDING').length

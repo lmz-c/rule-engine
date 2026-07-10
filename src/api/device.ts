@@ -28,6 +28,11 @@ export const updateDeviceLocation = (deviceId: string, latitude: number, longitu
     params: { deviceId, latitude, longitude }
   })
 }
+// ===== 设备管理 =====
+// 根据 deviceId 或 status 获取设备列表
+export const getDevice = (params?: { deviceId?: string; status?: number }) => {
+  return request.get('/api/device/listByCondition', { params })
+}
 
 // ===== 产品管理 =====
 export const getProductList = () => {

@@ -192,7 +192,7 @@ import { ref, onMounted, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Plus, Search, Monitor, CircleCheck, CircleClose } from '@element-plus/icons-vue'
-import { getDeviceList, registerDevice, deleteDevice, getDeviceDetail } from '@/api/device'
+import { getDeviceList, registerDevice, deleteDevice, getDeviceDetail ,getDevice} from '@/api/device'
 import dayjs from 'dayjs'
 
 const router = useRouter()
@@ -239,19 +239,16 @@ const formRules = {
 const loadData = async () => {
   loading.value = true
   try {
-    const params: any = {
-      page: pageNum.value,
-      size: pageSize.value
-    }
+    const params: any = {}
     if (searchKeyword.value) {
-      params.keyword = searchKeyword.value
+      params.deviceId = searchKeyword.value
     }
     if (searchStatus.value !== undefined) {
       params.status = searchStatus.value
     }
-    const res = await getDeviceList(params)
+    const res = await getDevice(params)
     deviceList.value = res.data || []
-    total.value = res.data.length || 0
+    total.value = deviceList.value.length
   } catch (e) {
     ElMessage.error('加载设备列表失败')
   } finally {

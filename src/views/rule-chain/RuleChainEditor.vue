@@ -267,7 +267,8 @@ const relationOptions = [
   'Success',
   'Failure',
   'Telemetry',
-  'Attributes'
+  'Attributes',
+  'Created'
 ]
 
 // ===== VueFlow =====

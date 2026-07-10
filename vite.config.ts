@@ -19,7 +19,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://192.168.43.148:8080',
+        target: 'http://192.168.152.125:8080',
         changeOrigin: true,
         configure: (proxy, options) => {
           console.log('✅ Vite 代理已配置:', options.target)
